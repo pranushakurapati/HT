@@ -64,7 +64,7 @@ def main(argv):
 
         if (run_id > 0):
             delete_existing_rows(table_name, run_id, stage_connection)
-            #delete_existing_rows("ETL_ERROR", run_id, config_connection)
+            delete_existing_rows("ETL_ERROR", run_id, config_connection)
 
         print("Inserting " + fname + ".........")
 
