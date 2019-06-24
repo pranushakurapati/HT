@@ -144,7 +144,7 @@ def fetch_col_specifications(pid, pname, fname_pattern, connection):
 
 
 def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_name, load_type):
-    #session = sessionmaker(bind=engine)()
+    pd.read_sql_query(''' remove @{0}'''.format(stage_name), connection)
 
     if load_type == 'FILE TO STG':
         data_frame.to_csv(folder_path+ '\Test_CSV_file_to_stage.csv', sep='`', header=False, index=False, na_rep='', quoting=csv.QUOTE_NONE)
@@ -163,9 +163,6 @@ def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_nam
     pd.read_sql_query("copy into {0} from @{1} force = true on_error = 'continue'".format(table_name, stage_name), connection)
 
     shutil.rmtree(folder_path)
-
-    #session.commit()
-    #session.close()
 
 
 def stage_to_source(process_id, process_name, file_name_pattern, stage_table, source_table, file,
