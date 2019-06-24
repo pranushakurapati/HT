@@ -76,7 +76,9 @@ def main(argv):
 
         stage_name='swb_source'
 
-        put_and_copy_file(working_folder, data, source_connection, table_name, stage_name, load_type = 'STG TO SRC')
+        data.to_csv(working_folder+ '\Test_CSV_file_to_stage.csv', sep='|', header=False, index=False, na_rep='')
+
+        put_and_copy_file(working_folder, data, source_connection, table_name, stage_name)
 
         errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format(table_name),
                                    source_connection)

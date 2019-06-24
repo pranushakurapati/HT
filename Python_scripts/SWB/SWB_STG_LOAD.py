@@ -5,6 +5,7 @@ import datetime
 import os
 import pandas as pd
 import json
+import csv
 
 from common_utils.stg_common_utils import *
 from common_utils import initial_config
@@ -77,7 +78,9 @@ def main(argv):
 
         stage_name='swb_stage'
 
-        put_and_copy_file(working_folder, data, stage_connection, table_name, stage_name, load_type = 'FILE TO STG')
+        data.to_csv(working_folder+ '\Test_CSV_file_to_stage.csv', sep='`', header=False, index=False, na_rep='', quoting=csv.QUOTE_NONE)
+
+        put_and_copy_file(working_folder, data, stage_connection, table_name, stage_name)
 
         errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format(table_name),
                                    stage_connection)
