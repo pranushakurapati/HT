@@ -13,7 +13,7 @@ time_of_load = datetime.datetime.now()
 file_previously_loaded_check = False
 
 config_connection = create_connection(initial_config.config_engine)
-import pdb;pdb.set_trace()
+
 staging_engine = json.loads(config_connection.execute('''select connection_str from connectiondata 
                                               where connection_id=1''').fetchone()[0])
 
@@ -82,8 +82,6 @@ def main(argv):
         errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format(table_name),
                                    stage_connection)
 
-        pd.read_sql_query(''' remove @{0}'''.format(stage_name), stage_connection)
-
         print('Number of Errors found: ' + str(errors.shape[0]))
 
         print('Number of Records Loaded: ' + str(data.shape[0] - errors.shape[0]))
@@ -104,15 +102,12 @@ def main(argv):
 
         update_run_id(stage_connection, table_name, run_id)
 
+        source_connection.execute('''insert into HT_SOURCE_DB.CONFIG.ETL_error( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,ERROR_CODE,ERROR_COL,CREATED_DATE) 
+                select {1}, {2}, error, line, code, column_name, '{3}' from table(validate({0}, job_id => '_last'))'''.format(table_name,run_id,process_id,time_of_load))
+
         if (errors.shape[0] > 0):
 
             print("ERRORS PRESENT WHILE LOADING........count:", errors.shape[0])
-            for index, error in errors.iterrows():
-                config_connection.execute(''' insert into ETL_ERROR( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,ERROR_CODE,ERROR_COL,CREATED_DATE) 
-                        values ({0},{1},'{2}','{3}','{4}','{5}','{6}')'''.format(run_id, process_id, error['error'].replace("'",""),
-                                                                                 error['line'], error['code'], error['column_name'],
-                                                                                 time_of_load))
-
             config_connection.execute(
                 ''' Update ETL_PROCESS set  status = 'FAILED' where run_id = {0}'''.format(run_id))
         else:
