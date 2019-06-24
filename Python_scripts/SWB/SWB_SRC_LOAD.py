@@ -72,7 +72,7 @@ def main(argv):
 
         if (run_id > 0):
             delete_existing_rows(table_name, run_id, source_connection)
-            delete_existing_rows("ETL_ERROR", run_id, config_connection)
+            #delete_existing_rows("ETL_ERROR", run_id, config_connection)
 
         stage_name='swb_source'
 
@@ -99,8 +99,8 @@ def main(argv):
 
         update_run_id(source_connection, table_name, run_id)
 
-        source_connection.execute('''insert into HT_SOURCE_DB.CONFIG.ETL_error( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,ERROR_CODE,ERROR_COL,CREATED_DATE) 
-                select {1}, {2}, error, line, code, column_name, '{3}' from table(validate({0}, job_id => '_last'))'''.format(table_name,run_id,process_id,time_of_load))
+        source_connection.execute('''insert into HT_SOURCE_DB.CONFIG.ETL_error( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,ERROR_CODE,ERROR_COL,CREATED_DATE, MODIFIED_DATE) 
+                select {1}, {2}, error, line, code, column_name, '{3}', '{3}' from table(validate({0}, job_id => '_last'))'''.format(table_name,run_id,process_id,time_of_load))
 
         if (errors.shape[0] > 0):
             print("ERRORS PRESENT WHILE LOADING........count:", errors.shape[0])
