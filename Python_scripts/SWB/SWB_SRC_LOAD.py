@@ -81,8 +81,6 @@ def main(argv):
         errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format(table_name),
                                    source_connection)
 
-        pd.read_sql_query(''' remove @{0}'''.format(stage_name), source_connection)
-
         print('Number of Records Loaded: ' + str(data.shape[0] - errors.shape[0]))
 
         record_details = [process_id, process_name, stg_table_name, file_type, table_name, 'STG TO SRC', file,
@@ -99,14 +97,11 @@ def main(argv):
 
         update_run_id(source_connection, table_name, run_id)
 
+        source_connection.execute('''insert into HT_SOURCE_DB.CONFIG.ETL_error( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,ERROR_CODE,ERROR_COL,CREATED_DATE) 
+                select {1}, {2}, error, line, code, column_name, '{3}' from table(validate({0}, job_id => '_last'))'''.format(table_name,run_id,process_id,time_of_load))
+
         if (errors.shape[0] > 0):
             print("ERRORS PRESENT WHILE LOADING........count:", errors.shape[0])
-            for index, error in errors.iterrows():
-                config_connection.execute(''' insert into ETL_ERROR( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,ERROR_CODE,ERROR_COL,CREATED_DATE) 
-                        values ({0},{1},'{2}','{3}','{4}','{5}','{6}')'''.format(run_id, process_id, error['error'].replace("'",""),
-                                                                                 error['line'], error['code'], error['column_name'],
-                                                                                 time_of_load))
-                #                             (errors[ERROR][0], errors[LINE][0],errors[CODE][0],errors[COLUMN_NAME][0]))
             config_connection.execute(
                 ''' Update ETL_PROCESS set  status = 'FAILED' where run_id = {0}'''.format(run_id))
         else:
