@@ -1,0 +1,115 @@
+#BLKD_STG_LOAD FILE
+import sys
+sys.path.append(".")
+
+import datetime
+import os
+import pandas as pd
+import json
+
+from common_utils.stg_common_utils import *
+from common_utils import initial_config
+from fsplit.filesplit import FileSplit
+
+
+time_of_load = datetime.datetime.now()
+file_previously_loaded_check = False
+
+config_connection = create_connection(config_engine)
+
+staging_engine = json.loads(config_connection.execute('''select connection_str from connectiondata 
+                                              where connection_id=1''').fetchone()[0])
+print('staging Conection: {}'.format(staging_engine))
+stage_connection = create_connection(staging_engine)
+
+
+#path = r'C:\Users\Shravani.Mynampally\Documents\HT\BLKD2'
+#process_id = 999
+#process_name = 'BLKD'
+
+def main(argv):
+
+    path = argv[0]
+    process_id = int(argv[1])
+    process_name = argv[2]
+
+	blkd_table_mapping = json.loads(config_connection.execute('''select mapping_dict from table_mapping where 
+	                                                            process_name='{0}' 
+	                                                            and load_type='FILE_TO_STG' '''.format(process_name)).fetchone()[0])
+	print('swb_table_mapping : {}'.format(swb_table_mapping))
+	
+	stage_connection.execute('''Create or replace table A_TEST2(Data Variant, PROCESS_ID NUMBER(10,0), 
+	    CUSTODIAN_NAME VARCHAR(255), RUN_ID NUMBER(11,0),CREATEDATE TIMESTAMP_LTZ)''')
+	
+	
+	files = os.listdir(path)
+	print(files)
+	
+	
+	
+	for file in files:
+	
+	    data = []
+	
+	    file_details = fetch_file_details(file)
+	    fname = file_details[0]
+	    file_date = file_details[1]
+	    file_type = file_details[2]
+	    
+	   
+	    table_name = blkd_table_mapping[fname]
+	    
+	    get_run_id = is_file_loaded(process_id, process_name, file, config_connection, load_type='FILE TO STG')
+	    print('get_run_id: {}'.format(get_run_id))
+	
+	    run_id = get_run_id[0]
+	    file_previously_loaded_check = get_run_id[1]
+	    
+	    if (run_id > 0):
+	        delete_existing_rows(table_name, run_id, stage_connection)
+	        #delete_existing_rows("ETL_ERROR", run_id, config_connection)
+	        
+	    
+	    stage_connection.execute('''CREATE OR REPLACE STAGE temp_stage''')
+	    stage_connection.execute(r"put file:///{path}\{file_name} @temp_stage".format(path=path,file_name=file))
+	    stage_connection.execute('''Create OR REPLACE table temp (Data Variant)''')
+	    stage_connection.execute('''COPY INTO TEMP FROM @temp_stage FILE_FORMAT=(TYPE='json' STRIP_OUTER_ARRAY=true) ON_ERROR = 'continue';''')
+	    
+	    errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format('temp'),
+	                                   stage_connection)
+	    
+	    stage_connection.execute('''ALTER TABLE Temp ADD PROCESS_ID NUMBER(10,0), 
+	    CUSTODIAN_NAME VARCHAR(255), RUN_ID NUMBER(11,0),CREATEDATE TIMESTAMP_LTZ;''')
+    	
+    	stage_connection.execute("UPDATE Temp SET PROCESS_ID = {}, CUSTODIAN_NAME = '{}',RUN_ID = {}, CREATEDATE = '{}';"
+    	                         .format(process_id, process_name, run_id, file_date))
+    	
+    	var = stage_connection.execute("INSERT INTO {} SELECT * FROM TEMP".format(table_name))
+    	
+	
+	    	stage_connection.execute('''DROP table TEMP''')
+	    	
+	    	
+	    	record_details = [process_id, process_name, file, file_type, table_name, 'FILE TO STG', file,
+	    	                      var.rowcount, 'In Progress', file_date,
+	    	                      datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+	    	                      var.rowcount, -3]
+	
+	    	
+	    	
+	    	if (file_previously_loaded_check == False):
+	    	    insert_into_etl_process(config_connection, record_details)
+	    	    run_id = fetch_run_id(config_connection, process_id, process_name, file, load_type='FILE TO STG')
+	    	else:
+	    	    record_details.append(run_id)
+	    	    update_etl_process(config_connection, record_details)
+	
+	    	update_run_id(stage_connection, table_name, run_id)
+	
+	config_connection.close()
+	stage_connection.close()
+    	
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
+    
