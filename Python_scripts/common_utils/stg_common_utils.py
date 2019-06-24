@@ -143,13 +143,8 @@ def fetch_col_specifications(pid, pname, fname_pattern, connection):
     return result, column_names_list
 
 
-def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_name, load_type):
+def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_name):
     pd.read_sql_query(''' remove @{0}'''.format(stage_name), connection)
-
-    if load_type == 'FILE TO STG':
-        data_frame.to_csv(folder_path+ '\Test_CSV_file_to_stage.csv', sep='`', header=False, index=False, na_rep='', quoting=csv.QUOTE_NONE)
-    else:
-        data_frame.to_csv(folder_path+ '\Test_CSV_file_to_stage.csv', sep='|', header=False, index=False, na_rep='')
 
     file_size = os.path.getsize(folder_path+ '\Test_CSV_file_to_stage.csv')
     if file_size > 200000000:  # Check if file size is greater than 200MB
