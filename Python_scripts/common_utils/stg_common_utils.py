@@ -7,7 +7,6 @@ from snowflake.sqlalchemy import URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fsplit.filesplit import FileSplit
-import shutil
 
 
 def create_connection(engine_name):
@@ -74,13 +73,14 @@ def fetch_file_details(file):
     return fname, fdate, ftype
 
 
-def create_staged_data(process_id, process_name, filedata,):
+def create_staged_data(process_id, process_name, filedata, filename):
     staged_data = pd.DataFrame(data=filedata, columns=["data"])
     staged_data["processid"] = process_id
     staged_data["custodian_name"] = process_name
     staged_data["run_id"] = None
     staged_data["createdate"] = datetime.datetime.now()
-    staged_data = staged_data[['processid', 'custodian_name', 'run_id', "data", "createdate"]]
+    staged_data["file_name"] = filename
+    staged_data = staged_data[['processid', 'custodian_name', 'run_id', "data", "createdate","file_name"]]
 
     return staged_data
 
@@ -105,8 +105,8 @@ def fetch_run_id(connection, process_id, process_name, file, load_type):
     return run_id
 
 
-def update_run_id(connection, table_name, run_id):
-    connection.execute(''' Update {0} set run_id = {1} where run_id is null'''.format(table_name, run_id))
+def update_run_id(connection, table_name, run_id, file):
+    connection.execute(''' Update {0} set run_id = {1} where run_id is null and file_name='{2}' '''.format(table_name, run_id, file))
 
 
 def update_etl_process(connection, *args):
@@ -143,21 +143,21 @@ def fetch_col_specifications(pid, pname, fname_pattern, connection):
     return result, column_names_list
 
 
-def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_name):
+def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_name, file_name):
     pd.read_sql_query(''' remove @{0}'''.format(stage_name), connection)
 
-    file_size = os.path.getsize(folder_path+ '\Test_CSV_file_to_stage.csv')
-    if file_size > 200000000:  # Check if file size is greater than 200MB
-        fs = FileSplit(file=folder_path+ '\Test_CSV_file_to_stage.csv', splitsize=50000000, output_dir=folder_path)  # Split each file into 50MB
-        fs.split()
-        os.remove(folder_path+ '\Test_CSV_file_to_stage.csv')  # Need to check if we have to delete the file
+    # file_size = os.path.getsize(folder_path+ '\Test_CSV_file_to_stage.csv')
+    # if file_size > 200000000:  # Check if file size is greater than 200MB
+        # fs = FileSplit(file=folder_path+ '\Test_CSV_file_to_stage.csv', splitsize=50000000, output_dir=folder_path)  # Split each file into 50MB
+        # fs.split()
+        # os.remove(folder_path+ '\Test_CSV_file_to_stage.csv')  # Need to check if we have to delete the file
 
-    pd.read_sql_query("put file://" + folder_path + "\Test_CSV_file_to_stage*.csv" + " @{0}".format(stage_name),
+    pd.read_sql_query("put file://" + folder_path + "\\"+ file_name + " @{0}".format(stage_name),
                       connection)
 
-    pd.read_sql_query("copy into {0} from @{1} force = true on_error = 'continue'".format(table_name, stage_name), connection)
+    pd.read_sql_query("copy into {0} from @{1}/{2}.gz force = true on_error = 'continue'".format(table_name, stage_name, file_name), connection)
 
-    shutil.rmtree(folder_path)
+    os.remove(folder_path + "\\"+ file_name)
 
 
 def stage_to_source(process_id, process_name, file_name_pattern, stage_table, source_table, file,
@@ -178,12 +178,18 @@ def stage_to_source(process_id, process_name, file_name_pattern, stage_table, so
         os.mkdir(working_folder + '\csv')
     working_folder = working_folder + '\csv'
 
-    data_from_stage.to_csv(working_folder+'\data_from_stage_to_source.csv', sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
-    data = pd.read_fwf(working_folder+'\data_from_stage_to_source.csv', colspecs=col_specs, header=None,
+    file_name = 'Test_{0}.csv'.format(file.split('.')[1])
+
+    data_from_stage.to_csv(working_folder+'\\'+file_name, sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
+    data = pd.read_fwf(working_folder+'\\'+file_name, colspecs=col_specs, header=None,
                        names=col_names, dtype=str, na_values=' ', keep_default_na=False,encoding='utf-8')
+    data['file_name'] = file
 
     print("data_from_stage ----- ", data.head())
+    os.remove(working_folder + "\\"+ file_name)
+
     return working_folder, data
+
 
 def fetch_col_specifications_PRSH(process_id, process_name, fname, config_connection):
 
@@ -201,23 +207,23 @@ def fetch_col_specifications_PRSH(process_id, process_name, fname, config_connec
     column_names_list = master_column_names['column_names'][0].split('|')
     final_specs_list = []
     final_column_names_list = []
-    for col_specs, column_names in zip(col_specs_list,column_names_list):
-        
+    for col_specs, column_names in zip(col_specs_list,column_names_list):        
         header_str = col_specs.split(';')
         index = []
-        
+
         for item in header_str:
             if(len(item) > 0):
                 index.append((item.split(',')[0], item.split(',')[1]))
-    
+
         result = list(tuple((int(x[0]), int(x[1])) for x in index))
-    
+
         result2 = column_names.split(',')
         result2 = [x.upper() for x in result2]
         final_specs_list.append(result)
         final_column_names_list.append(result2)
 
     return final_specs_list, final_column_names_list
+
 
 def stage_to_source_PRSH(process_id, process_name, fname, stg_table_name, table_name, file, column_specs_map,
                         column_name_map, stage_connection, config_connection):
@@ -242,13 +248,13 @@ def stage_to_source_PRSH(process_id, process_name, fname, stg_table_name, table_
         recordTypes = ['A','B']
     elif (fname == 'PRSH_ISCA'):
         recordTypes = ['A', 'C', 'D', 'E', 'F', 'G']
-            
+
     column_master_list = []
     for recordType in recordTypes:
         for x in column_name_map[recordType]:
             if(len(x) > 0 ):
                 column_master_list.append(x.strip())
-            
+
     column_master_list = list(dict.fromkeys(column_master_list))
     data = pd.DataFrame(columns=column_master_list)
     for recordType in recordTypes:
