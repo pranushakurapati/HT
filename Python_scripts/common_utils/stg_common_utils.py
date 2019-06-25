@@ -6,7 +6,7 @@ import csv
 from snowflake.sqlalchemy import URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from fsplit.filesplit import FileSplit
+#from fsplit.filesplit import FileSplit
 
 
 def create_connection(engine_name):
@@ -163,33 +163,33 @@ def put_and_copy_file(folder_path, data_frame, connection, table_name, stage_nam
 def stage_to_source(process_id, process_name, file_name_pattern, stage_table, source_table, file,
                     col_specs, col_names, stg_connection, conf_connection):
     print("Transferring: ", str(file_name_pattern), "id", process_id, "name", str(process_name))
-
     run_id = pd.read_sql_query(''' select run_id from etl_process where file_name = '{0}' and load_type = 'FILE TO STG' '''.format(file), conf_connection)
     run_id = run_id['run_id'][0]
-
+    
     data_from_stage = pd.read_sql_query(''' select data from {0} where run_id = {1}'''.format(stage_table,run_id), stg_connection)
     print("data_from_stage ----- ", data_from_stage.head())
-
+    
     working_folder = pd.read_sql_query('''select local_folder from filelocation where process_id={0}'''
-                                       .format(process_id), conf_connection)['local_folder'][0]
+    								   .format(process_id), conf_connection)['local_folder'][0]
     working_folder = working_folder.strip('"')
-
+    
     if not os.path.exists(working_folder + '\csv'):
-        os.mkdir(working_folder + '\csv')
+    	os.mkdir(working_folder + '\csv')
     working_folder = working_folder + '\csv'
-
+    
     file_name = 'Test_{0}.csv'.format(file.split('.')[1])
-
+    
     data_from_stage.to_csv(working_folder+'\\'+file_name, sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
     data = pd.read_fwf(working_folder+'\\'+file_name, colspecs=col_specs, header=None,
-                       names=col_names, dtype=str, na_values=' ', keep_default_na=False,encoding='utf-8')
+    				   names=col_names, dtype=str, na_values=' ', keep_default_na=False,encoding='utf-8')
     data['file_name'] = file
-
+    
     print("data_from_stage ----- ", data.head())
     os.remove(working_folder + "\\"+ file_name)
-
+    
     return working_folder, data
-
+    
+    
 
 def fetch_col_specifications_PRSH(process_id, process_name, fname, config_connection):
 
@@ -207,23 +207,23 @@ def fetch_col_specifications_PRSH(process_id, process_name, fname, config_connec
     column_names_list = master_column_names['column_names'][0].split('|')
     final_specs_list = []
     final_column_names_list = []
-    for col_specs, column_names in zip(col_specs_list,column_names_list):        
+    for col_specs, column_names in zip(col_specs_list,column_names_list):
+        
         header_str = col_specs.split(';')
         index = []
-
+        
         for item in header_str:
             if(len(item) > 0):
                 index.append((item.split(',')[0], item.split(',')[1]))
-
+    
         result = list(tuple((int(x[0]), int(x[1])) for x in index))
-
+    
         result2 = column_names.split(',')
         result2 = [x.upper() for x in result2]
         final_specs_list.append(result)
         final_column_names_list.append(result2)
 
     return final_specs_list, final_column_names_list
-
 
 def stage_to_source_PRSH(process_id, process_name, fname, stg_table_name, table_name, file, column_specs_map,
                         column_name_map, stage_connection, config_connection):
@@ -248,26 +248,30 @@ def stage_to_source_PRSH(process_id, process_name, fname, stg_table_name, table_
         recordTypes = ['A','B']
     elif (fname == 'PRSH_ISCA'):
         recordTypes = ['A', 'C', 'D', 'E', 'F', 'G']
-
+            
     column_master_list = []
     for recordType in recordTypes:
         for x in column_name_map[recordType]:
             if(len(x) > 0 ):
                 column_master_list.append(x.strip())
-
+            
     column_master_list = list(dict.fromkeys(column_master_list))
     data = pd.DataFrame(columns=column_master_list)
+    file_name = 'Test_{0}.csv'.format(file.split('.')[0])
     for recordType in recordTypes:
         print(recordType)
         if (fname == 'PRSH_ISCA'):
-            data_from_stage[data_from_stage['data'].apply(lambda x : x[0:1] == recordType)].to_csv(working_folder+'\data_from_stage_to_source.csv', sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
+            data_from_stage[data_from_stage['data'].apply(lambda x : x[0:1] == recordType)].to_csv(working_folder+'\\'+file_name, sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
         else:
-            data_from_stage[data_from_stage['data'].apply(lambda x : x[2:3] == recordType)].to_csv(working_folder+'\data_from_stage_to_source.csv', sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
-        data_tmp = pd.read_fwf(working_folder+'\data_from_stage_to_source.csv', colspecs=column_specs_map[recordType], header=None,
+            data_from_stage[data_from_stage['data'].apply(lambda x : x[2:3] == recordType)].to_csv(working_folder+'\\'+file_name, sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
+        data_tmp = pd.read_fwf(working_folder+'\\'+file_name, colspecs=column_specs_map[recordType], header=None,
                        names=column_name_map[recordType], dtype=str, na_values=' ', keep_default_na=False,encoding='utf-8')
         data = data.append(data_tmp, ignore_index = True, sort=False)
         print(data.shape)
-        
+    data['file_name'] = file
+     	        
 
     print("data_from_stage ----- ", data.head())
+    os.remove(working_folder + "\\"+ file_name)
+
     return working_folder, data
