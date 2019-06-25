@@ -69,7 +69,7 @@ def multi_processing_function(argv, file):
     run_id = get_run_id[0]
     file_previously_loaded_check = get_run_id[1]
 
-    if (run_id > 0):
+    if run_id > 0:
         delete_existing_rows(table_name, run_id, source_connection)
         delete_existing_rows("ETL_ERROR", run_id, config_connection)
 
@@ -92,7 +92,7 @@ def multi_processing_function(argv, file):
                       datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                       data.shape[0], errors.shape[0]]
 
-    if (file_previously_loaded_check == False):
+    if file_previously_loaded_check is False:
         insert_into_etl_process(config_connection, record_details)
         run_id = fetch_run_id(config_connection, process_id, process_name, file, load_type='STG TO SRC')
     else:
@@ -106,7 +106,7 @@ def multi_processing_function(argv, file):
                                 column_name, '{3}', '{3}' from table(validate({0}, job_id => '_last'))'''.format(
         table_name, run_id, process_id, time_of_load))
 
-    if (errors.shape[0] > 0):
+    if errors.shape[0] > 0:
         print("ERRORS PRESENT WHILE LOADING........count:", errors.shape[0])
         config_connection.execute(
             ''' Update ETL_PROCESS set  status = 'FAILED' where run_id = {0}'''.format(run_id))

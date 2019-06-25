@@ -97,7 +97,7 @@ def multi_processing_function(argv, file):
                       datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                       data.shape[0], errors.shape[0]]
 
-    if file_previously_loaded_check == False:
+    if file_previously_loaded_check is False:
         insert_into_etl_process(config_connection, record_details)
         run_id = fetch_run_id(config_connection, process_id, process_name, file, load_type='FILE TO STG')
     else:
