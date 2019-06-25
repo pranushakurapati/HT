@@ -177,7 +177,7 @@ def stage_to_source(process_id, process_name, file_name_pattern, stage_table, so
     	os.mkdir(working_folder + '\csv')
     working_folder = working_folder + '\csv'
     
-    file_name = 'Test_{0}.csv'.format(file.split('.')[1])
+    file_name = 'Test_{0}.csv'.format(os.path.splitext(file)[0])
     
     data_from_stage.to_csv(working_folder+'\\'+file_name, sep='`',header=False,index=False, na_rep='',quoting=csv.QUOTE_NONE)
     data = pd.read_fwf(working_folder+'\\'+file_name, colspecs=col_specs, header=None,
