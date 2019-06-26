@@ -18,7 +18,7 @@ config_engine = {
     'user':'ABServiceAccountSnowflake', #'ABServiceAccountSnowflake',
     'password': 'Hightower2019!',
     'account': 'hightoweradvisors.us-east-1', #'saggezzapartner.us-east-1',
-    'warehouse': 'demo_wh',#'HT_WH',# Needs to be changed accordingly with respect to High Tower Instance
+    'warehouse': 'HT_SOURCE_WH',#'HT_WH',# Needs to be changed accordingly with respect to High Tower Instance
     'database': 'HT_SOURCE_DB',# Needs to be changed accordingly with respect to High Tower Instance
     'schema': 'CONFIG',# Needs to be changed accordingly with respect to High Tower Instance
     'role': 'DEVELOPER', #'HT_DEVELOPER',
