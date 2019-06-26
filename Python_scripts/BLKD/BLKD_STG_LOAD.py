@@ -15,13 +15,13 @@ import json
 
 
 config_engine = {
-    'user':'ABServiceAccountSnowflake', #'ABServiceAccountSnowflake',
+    'user':'ABServiceAccountSnowflake',
     'password': 'Hightower2019!',
-    'account': 'hightoweradvisors.us-east-1', #'saggezzapartner.us-east-1',
-    'warehouse': 'HT_SOURCE_WH',#'HT_WH',# Needs to be changed accordingly with respect to High Tower Instance
+    'account': 'hightoweradvisors.us-east-1', 
+    'warehouse': 'HT_SOURCE_WH',# Needs to be changed accordingly with respect to High Tower Instance
     'database': 'HT_SOURCE_DB',# Needs to be changed accordingly with respect to High Tower Instance
     'schema': 'CONFIG',# Needs to be changed accordingly with respect to High Tower Instance
-    'role': 'DEVELOPER', #'HT_DEVELOPER',
+    'role': 'DEVELOPER',
     'numpy': True
 }
 
@@ -109,7 +109,7 @@ def process_files(path):
     files = os.listdir(path)
     print(files)
 
-    ##NEWLY ADDED CODE TO AVOID SPACES IN FILENAMES
+    #CODE TO AVOID SPACES IN FILENAMES
     for filename in files:
         if ' ' in filename:
             NewName = filename.replace(" ", "")
@@ -131,9 +131,6 @@ staging_engine = json.loads(config_connection.execute('''select connection_str f
 print('staging Conection: {}'.format(staging_engine))
 stage_connection = create_connection(staging_engine)
 
-
-#stage_connection.execute('''Create or replace table BLKD_ACCOUNT_STG(Data Variant, PROCESS_ID NUMBER(10,0), 
-    #CUSTODIAN_NAME VARCHAR(255), RUN_ID NUMBER(11,0),CREATEDATE TIMESTAMP_LTZ)''')
 
 
 def main(argv):
@@ -170,7 +167,7 @@ def main(argv):
         
         if (run_id > 0):
             delete_existing_rows(table_name, run_id, stage_connection)
-            #delete_existing_rows("ETL_ERROR", run_id, config_connection)
+
             
         
         stage_connection.execute('''CREATE OR REPLACE STAGE temp_stage''')
