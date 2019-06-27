@@ -38,86 +38,85 @@ def multi_processing_function(argv, file):
     process_id = int(argv[1])
     process_name = argv[2]
 
-    file_details = fetch_file_details(file)
-    fname = file_details[0]
-    file_date = file_details[1]
-    file_type = file_details[2]
-
     try:
+        file_details = fetch_file_details(file)
+        fname = file_details[0]
+        file_date = file_details[1]
+        file_type = file_details[2]
+
         stg_table_name = pd.read_sql_query('''
         select tgt_table from etl_process where src_file_table_name ='{0}' and (status = 'SUCCESS')
         '''.format(file), config_connection)
         stg_table_name = stg_table_name['tgt_table'][0]
         table_name = swb_table_mapping[stg_table_name]
-    except IndexError:
-        print('''Staging table contains Errors''')
-        stg_table_name = pd.read_sql_query(''' select tgt_table from etl_process where src_file_table_name ='{0}'
-        and load_type='FILE TO STG' '''.format(file), config_connection)
-        stg_table_name = stg_table_name['tgt_table'][0]
-        table_name = swb_table_mapping[stg_table_name]
 
-    column_details = fetch_col_specifications(process_id, process_name, fname, config_connection)
-    column_specifications = column_details[0]
-    column_name = column_details[1]
+        # print('''Staging table contains Errors''')
+        # stg_table_name = pd.read_sql_query(''' select tgt_table from etl_process where src_file_table_name ='{0}'
+        # and load_type='FILE TO STG' '''.format(file), config_connection)
+        # stg_table_name = stg_table_name['tgt_table'][0]
+        # table_name = swb_table_mapping[stg_table_name]
 
-    source_details = stage_to_source(process_id, process_name, fname, stg_table_name, table_name, file,
-                                     column_specifications, column_name, stage_connection, config_connection)
-    working_folder = source_details[0]
-    data = source_details[1]
+        column_details = fetch_col_specifications(process_id, process_name, fname, config_connection)
+        column_specifications = column_details[0]
+        column_name = column_details[1]
 
-    get_run_id = is_file_loaded(process_id, process_name, file, config_connection, load_type='STG TO SRC')
-    run_id = get_run_id[0]
-    file_previously_loaded_check = get_run_id[1]
+        source_details = stage_to_source(process_id, process_name, fname, stg_table_name, table_name, file,
+                                         column_specifications, column_name, stage_connection, config_connection)
+        working_folder = source_details[0]
+        data = source_details[1]
 
-    if run_id > 0:
-        delete_existing_rows(table_name, run_id, source_connection)
-        delete_existing_rows("ETL_ERROR", run_id, config_connection)
+        get_run_id = is_file_loaded(process_id, process_name, file, config_connection, load_type='STG TO SRC')
+        run_id = get_run_id[0]
+        file_previously_loaded_check = get_run_id[1]
 
-    stage_name = 'swb_source'
+        if run_id > 0:
+            delete_existing_rows(table_name, run_id, source_connection)
+            delete_existing_rows("ETL_ERROR", run_id, config_connection)
 
-    file_name = 'Test_{0}.csv'.format(file.split('.txt')[0])
+        stage_name = 'swb_source'
 
-    data.to_csv(working_folder + '\Test_{0}.csv'.format(file.split('.txt')[0]), sep='|', header=False, index=False,
-                na_rep='')
+        file_name = 'Test_{0}.csv'.format(file.split('.txt')[0])
 
-    put_and_copy_file(working_folder, data, source_connection, table_name, stage_name, file_name)
+        data.to_csv(working_folder + '\Test_{0}.csv'.format(file.split('.txt')[0]), sep='|', header=False, index=False,
+                    na_rep='')
 
-    errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format(table_name),
-                               source_connection)
+        put_and_copy_file(working_folder, data, source_connection, table_name, stage_name, file_name)
 
-    print('Number of Records Loaded: ' + str(data.shape[0] - errors.shape[0]))
+        errors = pd.read_sql_query(''' select * from table(validate({0}, job_id => '_last'))'''.format(table_name),
+                                   source_connection)
 
-    record_details = [process_id, process_name, stg_table_name, file_type, table_name, 'STG TO SRC', file,
-                      data.shape[0] - errors.shape[0], 'In Progress', file_date,
-                      datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                      data.shape[0], errors.shape[0]]
+        print('Number of Records Loaded: ' + str(data.shape[0] - errors.shape[0]))
 
-    if file_previously_loaded_check is False:
-        insert_into_etl_process(config_connection, record_details)
-        run_id = fetch_run_id(config_connection, process_id, process_name, file, load_type='STG TO SRC')
-    else:
-        record_details.append(run_id)
-        update_etl_process(config_connection, record_details)
+        record_details = [process_id, process_name, stg_table_name, file_type, table_name, 'STG TO SRC', file,
+                          data.shape[0] - errors.shape[0], 'In Progress', file_date,
+                          datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                          data.shape[0], errors.shape[0]]
 
-    update_run_id(source_connection, table_name, run_id, file)
+        if file_previously_loaded_check is False:
+            insert_into_etl_process(config_connection, record_details)
+            run_id = fetch_run_id(config_connection, process_id, process_name, file, load_type='STG TO SRC')
+        else:
+            record_details.append(run_id)
+            update_etl_process(config_connection, record_details)
 
-    source_connection.execute('''insert into HT_SOURCE_DB.CONFIG.ETL_error( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,
-                                ERROR_CODE,ERROR_COL,CREATED_DATE, MODIFIED_DATE) select {1}, {2}, error, line, code,
-                                column_name, '{3}', '{3}' from table(validate({0}, job_id => '_last'))'''.format(
-        table_name, run_id, process_id, time_of_load))
+        update_run_id(source_connection, table_name, run_id, file)
 
-    if errors.shape[0] > 0:
-        print("ERRORS PRESENT WHILE LOADING........count:", errors.shape[0])
-        config_connection.execute(
-            ''' Update ETL_PROCESS set  status = 'FAILED' where run_id = {0}'''.format(run_id))
-    else:
-        print('''No ERRORS Updating 'ETL_PROCESS' table:''')
-        config_connection.execute(
-            ''' Update ETL_PROCESS set  status = 'SUCCESS' where run_id = {0}'''.format(run_id))
+        source_connection.execute('''insert into HT_SOURCE_DB.CONFIG.ETL_error( RUN_ID,PROCESS_ID,ERROR_DESC, ERROR_LINE,
+                                    ERROR_CODE,ERROR_COL,CREATED_DATE, MODIFIED_DATE) select {1}, {2}, error, line, code,
+                                    column_name, '{3}', '{3}' from table(validate({0}, job_id => '_last'))'''.format(
+            table_name, run_id, process_id, time_of_load))
 
-    config_connection.close()
-    stage_connection.close()
-    source_connection.close()
+        if errors.shape[0] > 0:
+            print("ERRORS PRESENT WHILE LOADING........count:", errors.shape[0])
+            config_connection.execute(
+                ''' Update ETL_PROCESS set  status = 'FAILED' where run_id = {0}'''.format(run_id))
+        else:
+            print('''No ERRORS Updating 'ETL_PROCESS' table:''')
+            config_connection.execute(
+                ''' Update ETL_PROCESS set  status = 'SUCCESS' where run_id = {0}'''.format(run_id))
+
+    except Exception as e:
+        print(str(e))
 
 
 def main(argv):
@@ -131,6 +130,10 @@ def main(argv):
     p.map(func, iterable)
     p.close()
     p.join()
+
+    config_connection.close()
+    stage_connection.close()
+    source_connection.close()
 
 
 if __name__ == '__main__':

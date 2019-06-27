@@ -6,6 +6,5 @@ config_engine = {
     'database': '',
     'schema': '',
     'role': '',
-    'numpy': 
+    'numpy': ''
 }
-

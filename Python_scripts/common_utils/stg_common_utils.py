@@ -180,7 +180,7 @@ def stage_to_source(process_id, process_name, file_name_pattern, stage_table, so
 
     file_name = 'Test_{0}.csv'.format(os.path.splitext(file)[0])
 
-    data_from_stage.to_csv(working_folder + '\\' + file_name, sep='`', header=False, index=False, na_rep='',
+    data_from_stage.to_csv(working_folder + '\\' + file_name, sep='{', header=False, index=False, na_rep='',
                            quoting=csv.QUOTE_NONE)
     data = pd.read_fwf(working_folder + '\\' + file_name, colspecs=col_specs, header=None, names=col_names, dtype=str,
                        na_values=' ', keep_default_na=False, encoding='utf-8')
