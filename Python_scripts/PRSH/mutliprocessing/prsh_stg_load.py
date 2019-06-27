@@ -44,7 +44,8 @@ def multi_processing_function(argv, file):
     	   fname == "PRSH_ACCF" or
     	   fname == "PRSH_GSDE" or
     	   fname == "PRSH_GTDE" or
-    	   fname == "PRSH_ISCA"):
+    	   fname == "PRSH_ISCA" or
+           fname == "PRSH_GCUS" ):
     		index1 = 0
     		index2 = 0
     		ignore_index = 0
