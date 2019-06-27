@@ -250,6 +250,8 @@ def stage_to_source_PRSH(process_id, process_name, fname, stg_table_name, table_
         recordTypes = ['A', 'B']
     elif fname == 'PRSH_ISCA':
         recordTypes = ['A', 'C', 'D', 'E', 'F', 'G']
+    elif fname == 'PRSH_GCUS':
+        recordTypes = ['A']
 
     column_master_list = []
     for recordType in recordTypes:
