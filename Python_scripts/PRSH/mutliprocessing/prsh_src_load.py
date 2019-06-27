@@ -98,6 +98,13 @@ def multi_processing_function(argv, file):
                   'F' : column_names[4],
                   'G' : column_names[5] 
             }
+    elif (fname == 'PRSH_GCUS'):
+        column_specs_map = {'A':column_specifications[0],
+                  'B' : column_specifications[1]
+                  }
+        column_name_map = {'A':column_names[0],
+                  'B' : column_names[1]
+                  }
     
     
     source_details = stage_to_source_PRSH(process_id, process_name, fname, stg_table_name, table_name, file, column_specs_map,
